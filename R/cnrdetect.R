@@ -119,7 +119,7 @@
 #' plot(permresults$synth_nris[[idx]], xlab="MD", ylab="ptcossim",
 #'      xlim=c(3.5,5.5), ylim=c(.85,.95))
 #' 
-#' # add point for this probable human:
+#' # add point for this probable bot:
 #' points(x=permresults$obs_nris[idx,1], y=permresults$obs_nris[idx,2], col="red",
 #'   pch=19)
 #' 
