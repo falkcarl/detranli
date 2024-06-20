@@ -34,6 +34,16 @@
 #' \code{TRUE}, returns additional information in a list.
 #' @param custom_funs (Optional) named list containing name-function pairs for
 #' user-defined feature functions. See Details.
+#' @param missingmethod Method for handling missing data, currently uses \code{"pointscalemidrange"},
+#' which is essentially middle value imputation. Not great, but what Dupuis et al used and found
+#' to do well enough in establishing utility of NRIs. This approach will not work well for rows
+#' with high rates of missing data.
+#' @param parallel_type (Experimental) If desired, the method of parallel processing. Each row's test
+#' can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
+#' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
+#' speed up computations considerably provided the computer has more than a couple processing cores to use.
+#' @param ncores (Experimental/Optional) Number of processing cores to use if doing parallel processing.
+#' @param seed (Optional) A random number seed, if you want the function to set the seed. Defaults to \code{NULL}.
 #' 
 #' @details
 #' Performs the permutation test in Ilagan and Falk (2023) for detecting survey
@@ -78,6 +88,11 @@
 #'    That is, the permutations of the original row in the dataset.}
 #' }
 #' 
+#' @importFrom parallel makeCluster clusterSetRNGStream parLapply stopCluster
+#' @importFrom furrr future_map furrr_options
+#' @importFrom future plan multicore multisession sequential
+#' @importFrom parallelly supportsMulticore
+#' @importFrom stats setNames
 #' @export
 #'
 #' @examples
@@ -85,14 +100,14 @@
 #' 
 #' # p values
 #' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
-#' numperms=1000) 
+#'   numperms=1000) 
 #' 
 #' # If wishing to do classification with, 95% sensitivity
 #' flags = ifelse(pvals < .05, "human", "bot")
 #' 
 #' # Obtain more than just p-values
 #' permresults = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
-#' numperms=1000, details=TRUE)
+#'   numperms=1000, details=TRUE)
 #' 
 #' # again, generate flags
 #' flags = ifelse(permresults$pvals < .05, "human", "bot")
@@ -124,14 +139,26 @@
 #'   pch=19)
 #' 
 #' 
+#' # Parallel processing examples
+#' 
+#' # Using parallel package, 2 cores:
+#' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
+#'    numperms=1000, parallel_type="parallel", ncores = 2, seed=1234)
+#' 
+#' # Using furrr package, 2 cores:
+#' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
+#'    numperms=1000, parallel_type="furrr", ncores = 2, seed=1234)
 cnrdetect = function(data, pointscales, numperms=1e3,
 feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
-details=FALSE, custom_funs=NULL) {
+details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange"),
+parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
   
 	# check input
 	stopifnot(ncol(data)==length(pointscales))
 	stopifnot(length(feat_funs)==length(feat_idvals))
 	if(!is.null(custom_funs)){stopifnot(is.list(custom_funs))}
+	parallel_type=match.arg(parallel_type)
+	missingmethod=match.arg(missingmethod)
 	
 	# Check data vs pointscales
 	# Currently assumes coding 1,2,... with NAs allowed
@@ -154,34 +181,65 @@ details=FALSE, custom_funs=NULL) {
 			f(x, ref)
 		})
 	}
-	# missing handling method
-	missingmethod = "pointscalemidrange"
+	
+	# function to do everything for a single row
+	permfun = function(i, data, pointscales, numperms, feats_combo, missingmethod){
+	  
+	  # missing data handling
+	  # consider only nonmissing
+	  idx_nonmiss = which(!is.na(data[i,]))
+	  if(length(idx_nonmiss)<=1) {
+	    return(NA)
+	  } # emergency exit: no more than one item nonmissing
+	  # likert space
+	  obs_likert = unname(data[i,idx_nonmiss])
+	  ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
+	  if(missingmethod=="pointscalemidrange") {
+	    ref_completed = imputepsm(ref, pointscales[idx_nonmiss])
+	  } # fill in missing in anchor set
+	  
+	  # synthetic bots
+	  synth_likert = makesynth(i, data[,idx_nonmiss,drop=FALSE],
+	                           pointscales=pointscales[idx_nonmiss], numperms=numperms)
+	  # feature space
+	  obs_nri = feats_combo(rbind(obs_likert), ref_completed)
+	  synth_nri = feats_combo(synth_likert, ref_completed)
+	  
+	  # p values
+	  pval <- feat2pval(obs_nri, synth_nri, feat_idvals=feat_idvals)
+	  
+	  return(list(pval=pval, obs_nri=setNames(obs_nri, feat_funs), synth_nri=synth_nri[-1,],
+	              synth_likert=synth_likert[-1,]))
+	}
+	
 	# calculate hypothesis tests
-	permlist = lapply(1:nrow(data), function(i) {
-		# consider only nonmissing
-		idx_nonmiss = which(!is.na(data[i,]))
-		if(length(idx_nonmiss)<=1) {
-			return(NA)
-		} # emergency exit: no more than one item nonmissing
-		# likert space
-		obs_likert = unname(data[i,idx_nonmiss])
-		ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
-		if(missingmethod=="pointscalemidrange") {
-			ref_completed = imputepsm(ref, pointscales[idx_nonmiss])
-		} # fill in missing in anchor set
-		synth_likert = makesynth(i, data[,idx_nonmiss,drop=FALSE], 
-		pointscales=pointscales[idx_nonmiss], numperms=numperms)
-		# feature space
-		obs_nri = feats_combo(rbind(obs_likert), ref_completed)
-		synth_nri = feats_combo(synth_likert, ref_completed)
+	if(parallel_type=="lapply"){
+	  set.seed(seed)
+	  permlist = lapply(1:nrow(data), permfun, data=data, pointscales=pointscales,
+	                    numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
+	} else if (parallel_type=="parallel") {
+	  cl <- makeCluster(ncores)
+	  clusterSetRNGStream(cl, seed)
+	  permlist<-parLapply(cl, as.list(1:nrow(data)), permfun, data=data, pointscales=pointscales,
+	                 numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
+	  stopCluster(cl)
+	} else if (parallel_type=="furrr"){
+	  if(supportsMulticore()){
+	    plan(multicore, workers=ncores)
+	  } else {
+	    plan(multisession, workers=ncores)
+	  }
+	  permlist<-future_map(1:nrow(data),  permfun, data=data, pointscales=pointscales,
+	                  numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod,
+	                  .options = furrr_options(seed=seed),
+	                  .progress=TRUE)
+	  
+	  #FIXME check giving me errors unless I do this
+	  if(!supportsMulticore()){
+	    plan(sequential)
+	  }
+	}	
 
-		# p values
-		pval <- feat2pval(obs_nri, synth_nri, feat_idvals=feat_idvals)
-		
-		return(list(pval=pval, obs_nri=setNames(obs_nri, feat_funs), synth_nri=synth_nri[-1,],
-		            synth_likert=synth_likert[-1,]))
-		
-	})
 
 	pvals = sapply(permlist, "[[", i="pval")
 	

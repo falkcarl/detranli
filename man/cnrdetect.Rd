@@ -11,7 +11,11 @@ cnrdetect(
   feat_funs = c("mahal", "ptcossim"),
   feat_idvals = c(0, +1),
   details = FALSE,
-  custom_funs = NULL
+  custom_funs = NULL,
+  missingmethod = c("pointscalemidrange"),
+  parallel_type = c("lapply", "parallel", "furrr"),
+  ncores = NULL,
+  seed = NULL
 )
 }
 \arguments{
@@ -36,6 +40,20 @@ cosine similarity.}
 
 \item{custom_funs}{(Optional) named list containing name-function pairs for
 user-defined feature functions. See Details.}
+
+\item{missingmethod}{Method for handling missing data, currently uses \code{"pointscalemidrange"},
+which is essentially middle value imputation. Not great, but what Dupuis et al used and found
+to do well enough in establishing utility of NRIs. This approach will not work well for rows
+with high rates of missing data.}
+
+\item{parallel_type}{(Experimental) If desired, the method of parallel processing. Each row's test
+can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
+\code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
+speed up computations considerably provided the computer has more than a couple processing cores to use.}
+
+\item{ncores}{(Experimental/Optional) Number of processing cores to use if doing parallel processing.}
+
+\item{seed}{(Optional) A random number seed, if you want the function to set the seed. Defaults to \code{NULL}.}
 }
 \value{
 Output depends on the value of \code{details}. If \code{FALSE}, a
@@ -107,14 +125,14 @@ set.seed(47)
 
 # p values
 pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
-numperms=1000) 
+  numperms=1000) 
 
 # If wishing to do classification with, 95\% sensitivity
 flags = ifelse(pvals < .05, "human", "bot")
 
 # Obtain more than just p-values
 permresults = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
-numperms=1000, details=TRUE)
+  numperms=1000, details=TRUE)
 
 # again, generate flags
 flags = ifelse(permresults$pvals < .05, "human", "bot")
@@ -141,9 +159,18 @@ idx = idx[length(idx)]
 plot(permresults$synth_nris[[idx]], xlab="MD", ylab="ptcossim",
      xlim=c(3.5,5.5), ylim=c(.85,.95))
 
-# add point for this probable human:
+# add point for this probable bot:
 points(x=permresults$obs_nris[idx,1], y=permresults$obs_nris[idx,2], col="red",
   pch=19)
 
 
+# Parallel processing examples
+
+# Using parallel package, 2 cores:
+pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
+   numperms=1000, parallel_type="parallel", ncores = 2, seed=1234)
+
+# Using furrr package, 2 cores:
+pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
+   numperms=1000, parallel_type="furrr", ncores = 2, seed=1234)
 }
