@@ -135,7 +135,7 @@ details=FALSE, custom_funs=NULL) {
 	
 	# Check data vs pointscales
 	# Currently assumes coding 1,2,... with NAs allowed
-	pointcheck <- all(sapply(1:ncol(data), function(j){ (data[,j] %in% 1:pointscales[j])|is.na(data[,j])}))
+	pointcheck = all(sapply(1:ncol(data), function(j){ (data[,j] %in% 1:pointscales[j])|is.na(data[,j])}))
 	if(!pointcheck){stop("cnrdetect assumes items are coded as integers starting from 1 (e.g., 1 2 3 4 5 for 5 categories).
 	                     In checking the data versus pointscales, a mismatch was found.")}
 	
@@ -144,12 +144,12 @@ details=FALSE, custom_funs=NULL) {
 		sapply(feat_funs, function(f) {
 		  if(!is.null(custom_funs)){
 		    if(f %in% names(custom_funs)){
-		      f <- custom_funs[[f]]
+		      f = custom_funs[[f]]
 		    } else {
-		      f <- get(f)
+		      f = get(f)
 		    }
 		  } else {
-		    f <- get(f)
+		    f = get(f)
 		  }
 			f(x, ref)
 		})
@@ -183,14 +183,14 @@ details=FALSE, custom_funs=NULL) {
 		
 	})
 
-	pvals <- sapply(permlist, "[[", i="pval")
+	pvals = sapply(permlist, "[[", i="pval")
 	
 	# For backward compatibility
 	# Otherwise could default to returning the entire list
 	if(details){
-	  obs_nris <- t(sapply(permlist, "[[", i="obs_nri"))
-	  synth_nris <- lapply(permlist, "[[", i="synth_nri")
-	  synth_likert <- lapply(permlist, "[[", i="synth_likert")
+	  obs_nris = t(sapply(permlist, "[[", i="obs_nri"))
+	  synth_nris = lapply(permlist, "[[", i="synth_nri")
+	  synth_likert = lapply(permlist, "[[", i="synth_likert")
 	  return(list(pvals=pvals, obs_nris=obs_nris, synth_nris=synth_nris,
 	              synth_likert=synth_likert))
 	} else {
