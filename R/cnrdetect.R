@@ -128,10 +128,16 @@ cnrdetect = function(data, pointscales, numperms=1e3,
 feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
 details=FALSE, custom_funs=NULL) {
   
-	# assert
+	# check input
 	stopifnot(ncol(data)==length(pointscales))
 	stopifnot(length(feat_funs)==length(feat_idvals))
 	if(!is.null(custom_funs)){stopifnot(is.list(custom_funs))}
+	
+	# Check data vs pointscales
+	# Currently assumes coding 1,2,... with NAs allowed
+	pointcheck <- all(sapply(1:ncol(data), function(j){ (data[,j] %in% 1:pointscales[j])|is.na(data[,j])}))
+	if(!pointcheck){stop("cnrdetect assumes items are coded as integers starting from 1 (e.g., 1 2 3 4 5 for 5 categories).
+	                     In checking the data versus pointscales, a mismatch was found.")}
 	
 	# combine features into one function
 	feats_combo = function(x, ref) {
