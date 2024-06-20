@@ -12,7 +12,7 @@ cnrdetect(
   feat_idvals = c(0, +1),
   details = FALSE,
   custom_funs = NULL,
-  missingmethod = c("pointscalemidrange"),
+  missingmethod = c("pointscalemidrange", "EM"),
   parallel_type = c("lapply", "parallel", "furrr"),
   ncores = NULL,
   seed = NULL
@@ -41,10 +41,7 @@ cosine similarity.}
 \item{custom_funs}{(Optional) named list containing name-function pairs for
 user-defined feature functions. See Details.}
 
-\item{missingmethod}{Method for handling missing data, currently uses \code{"pointscalemidrange"},
-which is essentially middle value imputation. Not great, but what Dupuis et al used and found
-to do well enough in establishing utility of NRIs. This approach will not work well for rows
-with high rates of missing data.}
+\item{missingmethod}{Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}.}
 
 \item{parallel_type}{(Experimental) If desired, the method of parallel processing. Each row's test
 can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
@@ -113,12 +110,32 @@ defined, for nonresponsitivity index functions prior to looking in the package
 namespace.
   
 Custom-defined feature functions (or nonresponsitivity indices) are possible
-by passing a named list to \code{custom_funs}.  Function signatures for each
-function should be \code{function(x, ref)} where \code{x} is a vector or data
-frame of observations whose features we seek and \code{ref} is a data frame
-to use for the reference sample, if required. For instance, \code{ref} would
-contain a reference sample used to compute column means of some items with those
-means later used in the calculation of person-total correlation.
+by passing a named list to \code{custom_funs}. Function signatures for each
+function should be \code{function(x, ref, ..., missargs)} where \code{x} is a
+vector or data frame of observations whose features we seek, \code{ref} is a
+data frame to use for the reference sample, if required, \code{...} is not
+used internally but the custom function may have other options (e.g., see
+\code{\link{mahal}}), and \code{missargs} accepts a list of possible missing
+data handling options for the reference sample (see later). For instance,
+\code{ref} would contain a reference sample used to compute column means of
+some items with those means later used in the calculation of person-total
+correlation.
+
+For handling missing data, only observations that each row actually completes
+will be used in their permutation test. However, other rows in the reference
+sample may have missing data, which complicates computation of means and 
+covariances for feature functions such as Mahalanobis distance, person-total
+correlation, and person-total cosine similarity. The default currently uses
+\code{"pointscalemidrange"}, which is essentially middle value imputation.
+Not great, but what Dupuis et al (2018) used and found to do well enough in
+establishing utility of such indices. \code{"EM"} is experimental and uses
+the EM algorithm to obtain a saturated mean and covariance matrix, assuming
+multivariate normal data from the reference sample. This option is passed 
+down to feature functions, which have been written to implement this option.
+Custom defined feature functions will not implement this approach unless told
+to do so, though the exact way to do this is not yet documented. See
+\code{\link{mahal}} for an example. Either way the test may not work well for
+rows with high rates of missing data.
 }
 \examples{
 set.seed(47)

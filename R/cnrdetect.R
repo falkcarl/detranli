@@ -34,10 +34,7 @@
 #' \code{TRUE}, returns additional information in a list.
 #' @param custom_funs (Optional) named list containing name-function pairs for
 #' user-defined feature functions. See Details.
-#' @param missingmethod Method for handling missing data, currently uses \code{"pointscalemidrange"},
-#' which is essentially middle value imputation. Not great, but what Dupuis et al used and found
-#' to do well enough in establishing utility of NRIs. This approach will not work well for rows
-#' with high rates of missing data.
+#' @param missingmethod Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}. 
 #' @param parallel_type (Experimental) If desired, the method of parallel processing. Each row's test
 #' can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
 #' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
@@ -63,12 +60,32 @@
 #' namespace.
 #'   
 #' Custom-defined feature functions (or nonresponsitivity indices) are possible
-#' by passing a named list to \code{custom_funs}.  Function signatures for each
-#' function should be \code{function(x, ref)} where \code{x} is a vector or data
-#' frame of observations whose features we seek and \code{ref} is a data frame
-#' to use for the reference sample, if required. For instance, \code{ref} would
-#' contain a reference sample used to compute column means of some items with those
-#' means later used in the calculation of person-total correlation.
+#' by passing a named list to \code{custom_funs}. Function signatures for each
+#' function should be \code{function(x, ref, ..., missargs)} where \code{x} is a
+#' vector or data frame of observations whose features we seek, \code{ref} is a
+#' data frame to use for the reference sample, if required, \code{...} is not
+#' used internally but the custom function may have other options (e.g., see
+#' \code{\link{mahal}}), and \code{missargs} accepts a list of possible missing
+#' data handling options for the reference sample (see later). For instance,
+#' \code{ref} would contain a reference sample used to compute column means of
+#' some items with those means later used in the calculation of person-total
+#' correlation.
+#' 
+#' For handling missing data, only observations that each row actually completes
+#' will be used in their permutation test. However, other rows in the reference
+#' sample may have missing data, which complicates computation of means and 
+#' covariances for feature functions such as Mahalanobis distance, person-total
+#' correlation, and person-total cosine similarity. The default currently uses
+#' \code{"pointscalemidrange"}, which is essentially middle value imputation.
+#' Not great, but what Dupuis et al (2018) used and found to do well enough in
+#' establishing utility of such indices. \code{"EM"} is experimental and uses
+#' the EM algorithm to obtain a saturated mean and covariance matrix, assuming
+#' multivariate normal data from the reference sample. This option is passed 
+#' down to feature functions, which have been written to implement this option.
+#' Custom defined feature functions will not implement this approach unless told
+#' to do so, though the exact way to do this is not yet documented. See
+#' \code{\link{mahal}} for an example. Either way the test may not work well for
+#' rows with high rates of missing data.
 #' 
 #' @return Output depends on the value of \code{details}. If \code{FALSE}, a
 #' vector of p-values. Smaller p-values are less suspicious. If not \code{TRUE},
@@ -150,7 +167,7 @@
 #'    numperms=1000, parallel_type="furrr", ncores = 2, seed=1234)
 cnrdetect = function(data, pointscales, numperms=1e3,
 feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
-details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange"),
+details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange","EM"),
 parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
   
 	# check input
@@ -167,7 +184,7 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	                     In checking the data versus pointscales, a mismatch was found.")}
 	
 	# combine features into one function
-	feats_combo = function(x, ref) {
+	feats_combo = function(x, ref, missargs) {
 		sapply(feat_funs, function(f) {
 		  if(!is.null(custom_funs)){
 		    if(f %in% names(custom_funs)){
@@ -178,35 +195,40 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 		  } else {
 		    f = get(f)
 		  }
-			f(x, ref)
+			f(x, ref, missargs=missargs)
 		})
 	}
 	
 	# function to do everything for a single row
 	permfun = function(i, data, pointscales, numperms, feats_combo, missingmethod){
 	  
-	  # missing data handling
-	  # consider only nonmissing
+	  # consider only nonmissing for a given row
 	  idx_nonmiss = which(!is.na(data[i,]))
 	  if(length(idx_nonmiss)<=1) {
 	    return(NA)
 	  } # emergency exit: no more than one item nonmissing
 	  # likert space
 	  obs_likert = unname(data[i,idx_nonmiss])
-	  ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
-	  if(missingmethod=="pointscalemidrange") {
-	    ref_completed = imputepsm(ref, pointscales[idx_nonmiss])
-	  } # fill in missing in anchor set
-	  
+
 	  # synthetic bots
 	  synth_likert = makesynth(i, data[,idx_nonmiss,drop=FALSE],
 	                           pointscales=pointscales[idx_nonmiss], numperms=numperms)
+	  
+	  # missing data handling
+	  # fill in missing in anchor set
+	  if(missingmethod=="pointscalemidrange") {
+	    ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
+	    ref_completed = imputepsm(ref, pointscales[idx_nonmiss])
+	  } else {
+	    ref_completed = as.matrix(data[-i, , drop=FALSE]) # don't fill in
+	  }
+	  
 	  # feature space
-	  obs_nri = feats_combo(rbind(obs_likert), ref_completed)
-	  synth_nri = feats_combo(synth_likert, ref_completed)
+	  obs_nri = feats_combo(rbind(obs_likert), ref_completed, missargs=list(missingmethod=missingmethod, idx_nonmiss=idx_nonmiss))
+	  synth_nri = feats_combo(synth_likert, ref_completed, missargs=list(missingmethod=missingmethod, idx_nonmiss=idx_nonmiss))
 	  
 	  # p values
-	  pval <- feat2pval(obs_nri, synth_nri, feat_idvals=feat_idvals)
+	  pval = feat2pval(obs_nri, synth_nri, feat_idvals=feat_idvals)
 	  
 	  return(list(pval=pval, obs_nri=setNames(obs_nri, feat_funs), synth_nri=synth_nri[-1,],
 	              synth_likert=synth_likert[-1,]))
@@ -218,9 +240,9 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	  permlist = lapply(1:nrow(data), permfun, data=data, pointscales=pointscales,
 	                    numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
 	} else if (parallel_type=="parallel") {
-	  cl <- makeCluster(ncores)
+	  cl = makeCluster(ncores)
 	  clusterSetRNGStream(cl, seed)
-	  permlist<-parLapply(cl, as.list(1:nrow(data)), permfun, data=data, pointscales=pointscales,
+	  permlist = parLapply(cl, as.list(1:nrow(data)), permfun, data=data, pointscales=pointscales,
 	                 numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
 	  stopCluster(cl)
 	} else if (parallel_type=="furrr"){
@@ -229,7 +251,7 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	  } else {
 	    plan(multisession, workers=ncores)
 	  }
-	  permlist<-future_map(1:nrow(data),  permfun, data=data, pointscales=pointscales,
+	  permlist = future_map(1:nrow(data),  permfun, data=data, pointscales=pointscales,
 	                  numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod,
 	                  .options = furrr_options(seed=seed),
 	                  .progress=TRUE)

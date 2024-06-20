@@ -21,7 +21,8 @@ Imports:
     furrr,
     future,
     parallel,
-    parallelly
+    parallelly,
+    EMgaussian
 Depends: 
     R (>= 2.10)
 LazyData: true
