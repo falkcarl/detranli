@@ -237,7 +237,9 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	
 	# calculate hypothesis tests
 	if(parallel_type=="lapply"){
-	  set.seed(seed)
+	  if(!is.null(seed)){
+	    set.seed(seed)
+	  }
 	  permlist = lapply(1:nrow(data), permfun, data=data, pointscales=pointscales,
 	                    numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
 	} else if (parallel_type=="parallel") {
