@@ -205,7 +205,8 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	  # consider only nonmissing for a given row
 	  idx_nonmiss = which(!is.na(data[i,]))
 	  if(length(idx_nonmiss)<=1) {
-	    return(NA)
+	    return(list(pval=NA, obs_nri=setNames(rep(NA, length(feat_funs)), feat_funs), synth_nri=NA,
+	                synth_likert=NA))
 	  } # emergency exit: no more than one item nonmissing
 	  # likert space
 	  obs_likert = unname(data[i,idx_nonmiss])
@@ -264,7 +265,7 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 
 
 	pvals = sapply(permlist, "[[", i="pval")
-	
+
 	# For backward compatibility
 	# Otherwise could default to returning the entire list
 	if(details){
