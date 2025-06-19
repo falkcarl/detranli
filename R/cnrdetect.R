@@ -199,38 +199,6 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 		})
 	}
 
-	# missing handling method
-	missingmethod = "pointscalemidrange"
-	# calculate hypothesis tests
-	permlist = lapply(1:nrow(data), function(i) {
-		# consider only nonmissing
-		idx_nonmiss = which(!is.na(data[i,]))
-		if(length(idx_nonmiss)<=1) {
-			return(list(pval=NA, obs_nri=NULL, synth_nri=NULL, 
-			synth_likert=NULL))
-		} # emergency exit: no more than one item nonmissing
-		# likert space
-		obs_likert = unname(data[i,idx_nonmiss])
-		ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
-		if(missingmethod=="pointscalemidrange") {
-			ref_completed = imputepsm(ref, pointscales[idx_nonmiss])
-		} # fill in missing in anchor set
-		synth_likert = makesynth(i, data[,idx_nonmiss,drop=FALSE], 
-		pointscales=pointscales[idx_nonmiss], numperms=numperms)
-		# feature space
-		obs_nri = feats_combo(rbind(obs_likert), ref_completed)
-		synth_nri = feats_combo(synth_likert, ref_completed)
-
-		# p values
-		pval <- feat2pval(obs_nri, synth_nri, feat_idvals=feat_idvals)
-		
-		return(list(pval=pval, obs_nri=setNames(obs_nri, feat_funs), 
-		synth_nri=synth_nri[-1,], synth_likert=synth_likert[-1,]))
-		
-	})
-
-	pvals <- sapply(permlist, "[[", i="pval")
-
 	# function to do everything for a single row
 	permfun = function(i, data, pointscales, numperms, feats_combo, missingmethod){
 	  
