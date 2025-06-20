@@ -16,13 +16,17 @@ Maintainer: Michael John Ilagan <michael.ilagan@mail.mcgill.ca>
 License: BSD_3_clause + file LICENSE
 URL: https://github.com/michaeljohnilagan/detranli
 Encoding: UTF-8
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Imports:
     furrr,
     future,
     parallel,
     parallelly,
     EMgaussian
+Suggests:
+    EFA.dimensions,
+    psych,
+    mirt
 Depends: 
     R (>= 2.10)
 LazyData: true
