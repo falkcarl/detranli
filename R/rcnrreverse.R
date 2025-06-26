@@ -10,11 +10,10 @@
 #' @param severity Integer specifying how many items in \code{whichreverse} should be messed up for each respondent.
 #' 
 #' @details
-#' Careless responders are often thought to respond diligently to many items, but
-#' sometimes misread some items. Reverse-worded items are one kind of item that
-#' may be misread; respondents do not see a negation and assume the item is 
-#' phrased in a positive way, leading them to respond on the wrong end of the
-#' response scale.
+#' Some participants respond diligently to many items, but sometimes misread
+#' some items, especially reverse-worded items. Respondents do not see a
+#' negation and assume the item is phrased in a positive way, leading them to
+#' respond on the wrong end of the Likert-type response scale.
 #' 
 #' The current approach requires input from a hypothetical human sample, which
 #' in examples is illustrated by fitting an (M)IRT model to data and using
@@ -25,11 +24,12 @@
 #' problematic for any given respondent (\code{severity}), this function will
 #' reverse code such items and then return the sample data matrix.
 #' 
-#' Note that such carelessness violates assumptions of \code{\link{cnrdetect}};
+#' Note that such responses violate assumptions of \code{\link{cnrdetect}};
 #' Item responses are not content unresponsive and are not exchangeable. As such,
 #' rates of detecting such carelessness are not expected to have high sensitivity.
-#' To the extent that contamination is low, it may be that careless responders
+#' To the extent that contamination is low, it may be that such responders
 #' are still flagged at higher rates than other diligent humans, however.
+#' Further research on this topic is forthcoming.
 #' 
 #' Likert-type categories are from 1 (not 0) to K where K is the highest category.
 #' 
@@ -62,7 +62,7 @@
 #' whichreverse <- c(3, 5, 8, 9, 10)
 #'
 #' # reverse code items
-#' rcnrcareless(dat, pointscales = rep(5, 10), whichreverse, severity=4)
+#' rcnrreverse(dat, pointscales = rep(5, 10), whichreverse, severity=4)
 #'
 #'
 #' # fit a mirt model to multidimensional data w/ some reverse-worded items
@@ -88,9 +88,9 @@
 #' whichreverse <- c(1, 9, 10, 11, 12, 22, 25)
 #'
 #' # reverse code items
-#' rcnrcareless(dat, pointscales = rep(6, 25), whichreverse, severity=7)
+#' rcnrreverse(dat, pointscales = rep(6, 25), whichreverse, severity=7)
 #' 
-rcnrcareless = function(data, pointscales, whichreverse, severity = length(whichreverse)) {
+rcnrreverse = function(data, pointscales, whichreverse, severity = length(whichreverse)) {
   
   if(length(whichreverse)< 1 | any(whichreverse > length(pointscales))){
     stop("whichreverse should be a vector of indices of length 1 or greater than indices which items
