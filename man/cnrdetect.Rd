@@ -13,6 +13,7 @@ cnrdetect(
   details = FALSE,
   custom_funs = NULL,
   missingmethod = c("pointscalemidrange", "EM"),
+  synthtype = c("perm", "markovchain"),
   parallel_type = c("lapply", "parallel", "furrr"),
   ncores = NULL,
   seed = NULL
@@ -42,6 +43,10 @@ cosine similarity.}
 user-defined feature functions. See Details.}
 
 \item{missingmethod}{Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}.}
+
+\item{synthtype}{Create synthetic data by doing permutations (\code{"perm"}) or by
+from a first-order Markov Chain (\code{"markovchain"}) with the same
+transition probabilities as the row. Defaults to permutations.}
 
 \item{parallel_type}{(Experimental) If desired, the method of parallel processing. Each row's test
 can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
