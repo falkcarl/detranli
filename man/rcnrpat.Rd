@@ -4,7 +4,13 @@
 \alias{rcnrpat}
 \title{Generate content-nonresponsive data using a pattern of response}
 \usage{
-rcnrpat(n, pointscales, type = c("updown", "endpoints"), prob = 0.05)
+rcnrpat(
+  n,
+  pointscales,
+  type = c("updown", "endpoints", "step"),
+  prob = 0.05,
+  nstep = 4
+)
 }
 \arguments{
 \item{n}{the sample size.}
@@ -12,9 +18,11 @@ rcnrpat(n, pointscales, type = c("updown", "endpoints"), prob = 0.05)
 \item{pointscales}{vector of integers indicating how many Likert-type response categories there are for each item. 
 Length must match the number of columns in \code{data}.}
 
-\item{type}{Pattern type. "updown" or "endpoints". See details.}
+\item{type}{Pattern type. "updown", "endpoints", "step". See details.}
 
 \item{prob}{Probability that pattern will be broken for any given item.}
+
+\item{nstep}{If "step", how many times a response is typically repeated.}
 }
 \value{
 The sample matrix.
@@ -38,6 +46,9 @@ response to a previous item.
 With "endpoints", responses randomly toggle between the lowest and highest
 category.
 
+With "step", responses are similar to "updown" but the same response may be
+repeated multiple times. e.g., 111222333.
+
 If \code{prob} is non-zero, \code{prob} of the time some other category is
 chosen with uniform probability.
 
@@ -52,8 +63,12 @@ rcnrpat(20, rep(5, 10), type="updown")
 # 20 participants, 10 5 category items, mostly endpoints
 rcnrpat(20, rep(5, 10), type="endpoints")
 
+# 20 participants, 10 5 category items, step pattern
+rcnrpat(20, rep(5, 10), type="step", nstep=4)
+
 
 }
 \seealso{
-\code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}}
+\code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}},
+ \code{\link{rcnrreverse}}, \code{\link{rcnrstring}}
 }

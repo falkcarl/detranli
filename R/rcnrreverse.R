@@ -5,9 +5,12 @@
 #' items.
 #' 
 #' @param data Existing "human" data matrix with which to mess up.
-#' @param pointscales Vector of integers indicating how many Likert-type response categories there are for each item. 
-#' @param whichreverse Vector of item indices for which items are most likely to be carelessly responded to.
-#' @param severity Integer specifying how many items in \code{whichreverse} should be messed up for each respondent.
+#' @param pointscales Vector of integers indicating how many Likert-type
+#'  response categories there are for each item. 
+#' @param whichreverse Vector of item indices for which items are most likely to
+#'  be carelessly responded to.
+#' @param severity Integer specifying how many items in \code{whichreverse}
+#'  should be messed up for each respondent.
 #' 
 #' @details
 #' Some participants respond diligently to many items, but sometimes misread
@@ -35,7 +38,8 @@
 #' 
 #' @return The sample matrix.
 #' 
-#' @seealso \code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}}
+#' @seealso \code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}},
+#'  \code{\link{rcnrstring}}, \code{\link{rcnrpat}}
 #' 
 #' @export
 #' 

@@ -48,7 +48,8 @@
 #' 
 #' @return The sample matrix.
 #' 
-#' @seealso \code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}}
+#' @seealso \code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}},
+#'  \code{\link{rcnrreverse}}, \code{\link{rcnrpat}}
 #' 
 #' @export
 #' 

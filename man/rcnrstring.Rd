@@ -76,5 +76,6 @@ rcnrstring(50, rep(5, 10), prob=.8, whichcat=NULL, allsame=FALSE)
 
 }
 \seealso{
-\code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}}
+\code{\link{sample}}, \code{\link{rcnrunif}}, \code{\link{rcnrbinom}},
+ \code{\link{rcnrreverse}}, \code{\link{rcnrpat}}
 }
