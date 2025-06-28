@@ -13,7 +13,9 @@ cnrdetect(
   details = FALSE,
   custom_funs = NULL,
   missingmethod = c("pointscalemidrange", "EM"),
-  synthtype = c("perm", "markovchain"),
+  synthtype = c("perm", "markovchain", "homarkovchain"),
+  mcorder = 2,
+  highestprob = FALSE,
   parallel_type = c("lapply", "parallel", "furrr"),
   ncores = NULL,
   seed = NULL
@@ -44,9 +46,12 @@ user-defined feature functions. See Details.}
 
 \item{missingmethod}{Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}.}
 
-\item{synthtype}{Create synthetic data by doing permutations (\code{"perm"}) or by
-from a first-order Markov Chain (\code{"markovchain"}) with the same
-transition probabilities as the row. Defaults to permutations.}
+\item{mcorder}{Positive integer that refers to the order of the markov chain or
+"n" for the n-gram approach.}
+
+\item{highestprob}{When \code{"homarkovchain"} is chosen, whether to simulate
+using the next category that has the highest probability (\code{TRUE}) or
+sample based on the available probabilities (\code{FALSE}).}
 
 \item{parallel_type}{(Experimental) If desired, the method of parallel processing. Each row's test
 can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
@@ -56,6 +61,12 @@ speed up computations considerably provided the computer has more than a couple 
 \item{ncores}{(Experimental/Optional) Number of processing cores to use if doing parallel processing.}
 
 \item{seed}{(Optional) A random number seed, if you want the function to set the seed. Defaults to \code{NULL}.}
+
+\item{type}{Create synthetic data by doing permutations (\code{"perm"}),
+from a first-order Markov Chain (\code{"markovchain"}) with the same
+transition probabilities as the row, or from a higher-order markov
+chain (\code{"homarkovchain"}), or by considering possible n-grams of
+response combinations (\code{"ngram"}). Defaults to permutations.}
 }
 \value{
 Output depends on the value of \code{details}. If \code{FALSE}, a

@@ -35,9 +35,16 @@
 #' @param custom_funs (Optional) named list containing name-function pairs for
 #' user-defined feature functions. See Details.
 #' @param missingmethod Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}. 
-#' @param synthtype Create synthetic data by doing permutations (\code{"perm"}) or by
+#' @param type Create synthetic data by doing permutations (\code{"perm"}),
 #' from a first-order Markov Chain (\code{"markovchain"}) with the same
-#' transition probabilities as the row. Defaults to permutations. 
+#' transition probabilities as the row, or from a higher-order markov
+#' chain (\code{"homarkovchain"}), or by considering possible n-grams of
+#' response combinations (\code{"ngram"}). Defaults to permutations.
+#' @param mcorder Positive integer that refers to the order of the markov chain or
+#' "n" for the n-gram approach.
+#' @param highestprob When \code{"homarkovchain"} is chosen, whether to simulate
+#' using the next category that has the highest probability (\code{TRUE}) or
+#' sample based on the available probabilities (\code{FALSE}). 
 #' @param parallel_type (Experimental) If desired, the method of parallel processing. Each row's test
 #' can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
 #' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
@@ -171,7 +178,7 @@
 cnrdetect = function(data, pointscales, numperms=1e3,
 feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
 details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange","EM"),
-synthtype=c("perm","markovchain"),
+synthtype=c("perm","markovchain","homarkovchain"), mcorder=2, highestprob=FALSE,
 parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
   
 	# check input
@@ -218,7 +225,7 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	  # synthetic bots
 	  synth_likert = makesynth(i, data[,idx_nonmiss,drop=FALSE],
 	                           pointscales=pointscales[idx_nonmiss], numperms=numperms,
-	                           type=synthtype)
+	                           type=synthtype, mcorder=mcorder, highestprob=highestprob)
 	  
 	  # missing data handling
 	  # fill in missing in anchor set
