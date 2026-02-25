@@ -47,7 +47,7 @@
 #' sample based on the available probabilities (\code{FALSE}). 
 #' @param parallel_type (Experimental) If desired, the method of parallel processing. Each row's test
 #' can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
-#' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
+#' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package), \code{"pbapply"} (uses pbapply package, with progress bar). The latter two may
 #' speed up computations considerably provided the computer has more than a couple processing cores to use.
 #' @param ncores (Experimental/Optional) Number of processing cores to use if doing parallel processing.
 #' @param seed (Optional) A random number seed, if you want the function to set the seed. Defaults to \code{NULL}.
@@ -118,6 +118,7 @@
 #' @importFrom parallel makeCluster clusterSetRNGStream parLapply stopCluster
 #' @importFrom furrr future_map furrr_options
 #' @importFrom future plan multicore multisession sequential
+#' @importFrom pbapply pblapply
 #' @importFrom parallelly supportsMulticore
 #' @importFrom stats setNames
 #' @export
@@ -178,8 +179,8 @@
 cnrdetect = function(data, pointscales, numperms=1e3,
 feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
 details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange","EM"),
-synthtype=c("perm","markovchain","homarkovchain"), mcorder=2, highestprob=FALSE,
-parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
+synthtype=c("perm","markovchain","homarkovchain","ngram"), mcorder=2, highestprob=FALSE,
+parallel_type=c("lapply","parallel","furrr","pbapply"), ncores=NULL, seed=NULL) {
   
 	# check input
 	stopifnot(ncol(data)==length(pointscales))
@@ -260,6 +261,12 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	  clusterSetRNGStream(cl, seed)
 	  permlist = parLapply(cl, as.list(1:nrow(data)), permfun, data=data, pointscales=pointscales,
 	                 numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
+	  stopCluster(cl)
+	} else if (parallel_type=="pbapply") {
+	  cl = makeCluster(ncores)
+	  clusterSetRNGStream(cl, seed)
+	  permlist = pblapply(as.list(1:nrow(data)), permfun, cl=cl,  data=data, pointscales=pointscales,
+	                      numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
 	  stopCluster(cl)
 	} else if (parallel_type=="furrr"){
 	  if(supportsMulticore()){

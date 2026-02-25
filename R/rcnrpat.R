@@ -51,7 +51,7 @@
 #' rcnrpat(20, rep(5, 10), type="step", nstep=4)
 #' 
 #' 
-rcnrpat = function(n, pointscales, type=c("updown","endpoints","step"),
+rcnrpat = function(n, pointscales, type=c("updown","endpoints","step","straightlining","seesawing","steplining","extremeSeesawing"),
                    prob=.05, nstep=4) {
   
   type = match.arg(type)
@@ -65,13 +65,11 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step"),
   if(nstep < 1){
     stop("nstep should be an integer, 1 or greater")
   }
-  
   if(type=="updown"){
     dat = t(sapply(1:n, function(i){
       tmp = sample(pointscales[1], 1)
       inc = 1
       for(j in 2:length(pointscales)){
-
         # get random response?
         if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
           tmp = c(tmp, sample(pointscales[j], 1))
@@ -88,12 +86,59 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step"),
       }
       tmp
     }))
-    
+  } else if(type=="seesawing"){
+    dat = t(sapply(1:n, function(i){
+      tmp = sample(pointscales[1], 1)
+      start = tmp
+      inc = 1
+      while(T){
+        interval = sample(1:pointscales[1],1)
+        if (start!=interval) break
+      }
+      for(j in 2:length(pointscales)){
+        if (start < interval){ # from smaller to larger response category
+          if(tmp[j-1] == interval){ # reached ending category
+            inc = -1            
+          } else if (tmp[j-1] == start) { # reached starting category
+            inc = 1
+          } 
+          tmp = c(tmp, tmp[j-1]+inc)
+        }
+        else{# from larger to smaller response category
+          if(tmp[j-1] == interval){ # reached ending category
+            inc = 1            
+          } else if (tmp[j-1] == start) { # reached starting category
+            inc = -1
+          } 
+          tmp = c(tmp, tmp[j-1]+inc)
+        }
+      }
+      for (t in 1: length(pointscales)){
+        # get random response?
+        if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
+          tmp[t] = sample(pointscales[t],1)
+        }
+      }
+      tmp
+    }))
+  } else if (type=="straightlining"){
+    dat = t(sapply(1:n, function(i){
+      tmp = numeric()
+      fixed.resp <- sample(1:pointscales[1],1)
+      for(j in 1:length(pointscales)){
+        # get random response?
+        if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
+          tmp = c(tmp, sample(pointscales[j], 1))
+        } else {
+          tmp = c(tmp, fixed.resp)
+        }
+      }
+      tmp
+    }))
   } else if (type=="endpoints"){
     dat = t(sapply(1:n, function(i){
       tmp = numeric()
       for(j in 1:length(pointscales)){
-        
         # get random response?
         if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
           tmp = c(tmp, sample(pointscales[j], 1))
@@ -123,7 +168,8 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step"),
             if(tmp[j-1] == pointscales[j]){ # reached top of scale
               inc = -1
               nrep = 1
-            } else if (tmp[j-1] == 1) { # reached bottom of scale
+            } 
+            else if (tmp[j-1] == 1) { # reached bottom of scale
               inc = 1
               nrep = 1
             }
@@ -134,7 +180,91 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step"),
       }
       tmp
     }))
-  }
-  
-	return(dat)
+  } else if (type=="steplining"){
+    dat = t(sapply(1:n, function(i){
+      tmp = sample(pointscales[1], 1)
+      start = tmp
+      nrep = 1
+      nstep = sample(2:nstep,1)
+      while(T){
+        interval = sample(1:pointscales[1],1)
+        if (start!=interval) break
+      }
+      for(j in 2:length(pointscales)){
+        if (pointscales[j] != pointscales[j-1]) { # change in pointscales? restart
+          tmp = c(tmp, sample(pointscales[j], 1))
+          start = tmp[j]
+          while(T){
+            interval = sample(1:pointscales[j],1)
+            if (start!=interval) break
+          }     
+        } 
+        if (start < interval){ #from smaller to larger response category
+          if(nrep < nstep){
+            tmp = c(tmp, tmp[j-1]) # same response as last time
+            nrep = nrep + 1
+          } else {
+            if(tmp[j-1] == interval){ # reached ending category
+              inc = -(interval-start)
+              nrep = 1
+            } 
+            else{
+              inc = 1
+            }
+            tmp = c(tmp, tmp[j-1]+inc)
+            nrep = 1
+          }
+        }
+        else{
+          if(nrep < nstep){ # from larger to smaller response category
+            tmp = c(tmp, tmp[j-1]) # same response as last time
+            nrep = nrep + 1
+          } else {
+            if(tmp[j-1] == interval){ # reached ending category
+              inc = -(interval-start)
+              nrep = 1
+            } 
+            else{
+              inc = -1
+            }
+            tmp = c(tmp, tmp[j-1]+inc)
+            nrep = 1
+          }
+        }        
+      }
+      for(t in 1:length(pointscales))
+      { # get random response?
+        if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
+          tmp[t] = sample(pointscales[t],1)
+        }  
+      }
+      tmp
+    }))
+  }  else if (type=="extremeSeesawing"){
+    dat = t(sapply(1:n, function(i){
+      tmp = sample(c(1,pointscales[1]),1)
+      start = tmp
+      end = pointscales[1] +1 - start
+      tmp = c(start,end)
+      j = 3
+      while(j <= length(pointscales)){
+        if (length(tmp) >= length(pointscales)-1){
+          tmp = c(tmp, start)
+          j = j + 1
+        }
+        else{
+          tmp = c(tmp, c(start,end))
+          j = j + 2
+        }
+      }
+      for (j in 1: length(pointscales)){
+        # get random response?
+        if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
+          tmp[j] = sample(pointscales[j],1)
+        }
+      }
+      tmp
+    }))
+  } 
+  return(dat)
 }

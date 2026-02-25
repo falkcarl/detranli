@@ -22,10 +22,12 @@ Imports:
     future,
     parallel,
     parallelly,
+    pbapply,
     EMgaussian,
     markovchain,
     ngram,
-    methods
+    methods,
+    responsePatterns
 Suggests:
     EFA.dimensions,
     psych,

@@ -13,10 +13,10 @@ cnrdetect(
   details = FALSE,
   custom_funs = NULL,
   missingmethod = c("pointscalemidrange", "EM"),
-  synthtype = c("perm", "markovchain", "homarkovchain"),
+  synthtype = c("perm", "markovchain", "homarkovchain", "ngram"),
   mcorder = 2,
   highestprob = FALSE,
-  parallel_type = c("lapply", "parallel", "furrr"),
+  parallel_type = c("lapply", "parallel", "furrr", "pbapply"),
   ncores = NULL,
   seed = NULL
 )
@@ -61,7 +61,7 @@ sample based on the available probabilities (\code{FALSE}).}
 
 \item{parallel_type}{(Experimental) If desired, the method of parallel processing. Each row's test
 can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
-\code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
+\code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package), \code{"pbapply"} (uses pbapply package, with progress bar). The latter two may
 speed up computations considerably provided the computer has more than a couple processing cores to use.}
 
 \item{ncores}{(Experimental/Optional) Number of processing cores to use if doing parallel processing.}

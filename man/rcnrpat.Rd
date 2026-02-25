@@ -7,7 +7,8 @@
 rcnrpat(
   n,
   pointscales,
-  type = c("updown", "endpoints", "step"),
+  type = c("updown", "endpoints", "step", "straightlining", "seesawing", "steplining",
+    "extremeSeesawing"),
   prob = 0.05,
   nstep = 4
 )
