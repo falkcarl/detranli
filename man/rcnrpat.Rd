@@ -19,11 +19,11 @@ rcnrpat(
 \item{pointscales}{vector of integers indicating how many Likert-type response categories there are for each item. 
 Length must match the number of columns in \code{data}.}
 
-\item{type}{Pattern type. "updown", "endpoints", "step". See details.}
+\item{type}{Pattern type. "updown", "endpoints", "step", "straightlining","seesawing","steplining", and "extremeSeesawing". See details.}
 
 \item{prob}{Probability that pattern will be broken for any given item.}
 
-\item{nstep}{If "step", how many times a response is typically repeated.}
+\item{nstep}{If "step" or "steplining", how many times a response is typically repeated.}
 }
 \value{
 The sample matrix.
@@ -50,10 +50,34 @@ category.
 With "step", responses are similar to "updown" but the same response may be
 repeated multiple times. e.g., 111222333.
 
-If \code{prob} is non-zero, \code{prob} of the time some other category is
-chosen with uniform probability.
+With "straightlining", responses are fixed to an identical category across all items.
+The fixed category is drawn randomly from all possible responses.
 
-Likert-type categories are from 1 (not 0) to K where K is the highest category.
+With "seesawing", participants complete items using a pattern close to zig-zag,
+but the recurring sequence is randomly selected from adjacent categories. e.g., 
+1, 2, 3, 2, 1, 2, 3, etc.; 4,3,4,3,4,3,4,etc.; 2, 3, 4, 5, 4, 3, 2, etc. 
+Two random categories are chosen as starting and ending
+points and if the survey switches between subscales with different numbers of
+categories per item (as specified by \code{pointscales}), the pattern also
+starts over again at new random starting and ending points. Item responses are 
+not independent in this case as the response to one item is often 
+dependent on the participant's response to a previous item.
+ 
+With "steplining", participants complete items using a straightlining pattern
+with moving anchors. i.e., they repeat one response category multiple times and then move to 
+the next adjacent category. e.g., 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 1, 1, 1, etc.
+Like seesawing, two random categories are chosen as starting and ending
+points and if the survey switches between subscales with different numbers of
+categories per item (as specified by \code{pointscales}), the pattern also
+starts over again at new random starting and ending points. Item responses are 
+not independent in this case as the response to one item is often 
+dependent on the participant's response to a previous item.
+
+
+With "extremeSeesawing", participants complete items using a pattern similar to
+seesawing, but the recurring sequence consist of solely two endpoints of the scale.
+e.g., 1, 5, 1, 5, 1, 5, etc.; 7, 1, 7, 1, 7, 1, etc. Other generation details are the same
+as "seesawing".
 }
 \examples{
 set.seed(47)

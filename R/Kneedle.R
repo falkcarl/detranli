@@ -1,24 +1,24 @@
 #' Careless responding detection using outlier statistics and the Kneedle algorithm
 #' 
-#' When using one outlier statistic, the algorithm will output the cutoff value of this
-#' specific statistic; when using multiple outlier statistics, it will output the cutoff 
-#' value of the Mahanolabis Distance consisting of all outlier statistics.
+#' When using one index, the algorithm will output the cutoff value of this
+#' specific index; when using multiple indices, it will output the cutoff 
+#' value of the Mahanolabis Distance of all indices.
 #' 
 #'  
 #' @param data Likert-type data (matrix or dataframe).
 #' @param pointscales vector of integers indicating how many Likert-type response 
 #' categories there are for each item. 
 #' Length must match the number of columns in \code{data}.
+#' @param leave_one_out Whether to use leave-one-out strategies when computing the outlier
+#' statistics and the distance of these outlier statistics. Default is "both". See details.
 #' @param feat_funs vector of nonresponsivity feature function names. Each function must 
 #' return a numeric vector. Defaults to Mahalanobis distance and person-total
-#' cosine similarity. See Details.
+#' cosine similarity. See \code{"cnrdetect"}.
 #' @param feat_idvals vector of ideal values, in the same order as \code{feat_funs}.
 #' Defaults to 0 and +1 as the ideal points for Mahalanobis distance and person-total
 #' cosine similarity.
-#' @param details If \code{FALSE} (the default), returns only p-values. If
-#' \code{TRUE}, returns additional information in a list.
 #' @param custom_funs (Optional) named list containing name-function pairs for
-#' user-defined feature functions. See Details.
+#' user-defined feature functions. See \code{"cnrdetect"}.
 #' @param missingmethod Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}. 
 #' @param parallel_type (Experimental) If desired, the method of parallel processing. Each row's test
 #' can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
@@ -28,6 +28,38 @@
 #' @param seed (Optional) A random number seed, if you want the function to set the seed. Defaults to \code{NULL}.
 #' @param plot (Optional) Whether to plot empirical CDF and the cutoff point. Defaults to \code{False}.
 
+#' @details
+#' 
+#' Performs Kneedle algorithm for setting threshold (cutoff value) for any given outlier
+#' statistics. 
+#' 
+#' When only one index is used in \code{feat_funs}, the algorithm will find thresholds for
+#' the index without reference to the ideal point. The single index should flag respondents with
+#' higer values, so manual transformation is needed before calling this function. This implementation
+#' is to keep aligned with the original paper suggesting using Kneedle for setting thresholds in
+#' detecting pattern respondents (Bieman et al., 2025)
+#' 
+#' When multiple indices are used in \code{feat_funs}, the algorithm will find thresholds for
+#' the indices with reference to the ideal points. Same as the main function (\code{cnrdetect}), 
+#' the distance of all these indices. Some indices (e.g., "mahal" and "ptc") require reference 
+#' samples for computation, and the distance measure also require computing the covariance matrix of
+#' indices based on a reference sample. Currently, two possible samples are provided
+#' for both steps: using the whole sample (i.e., each individual has the same reference sample) 
+#' or the leave-one-out sample (LOO, i.e., each individual has a different reference sample, which is all 
+#' other respondents). The choice is controlled by \code{leave_one_out}. "Both" means that LOO is used 
+#' for both steps; "indices" means that LOO is only used for computing relevant indices;
+#' "distance" means that LOO is only used for computing distance; "none" means that
+#' LOO is not used.
+#' 
+#' @return Output is a list with the following elements:
+#' 
+#' \itemize{
+#'  \item{\code{threshold}: the cutoff value used for making decisions.}
+#'  \item{\code{distance}: the distance of indices for each individual (when multiple indices are used) 
+#'  or the values of the index for each individual (when one index is used)}
+#' }
+#' 
+#' 
 #' @importFrom parallel makeCluster clusterSetRNGStream parLapply stopCluster
 #' @importFrom furrr future_map furrr_options
 #' @importFrom future plan multicore multisession sequential
@@ -37,10 +69,39 @@
 #' @importFrom graphics abline text
 
 #' @export
-kneedle_distance = function(data, pointscales,
+#' 
+#' @examples
+#' set.seed(4452)
+#' 
+#' # Obtain the thresholds and distance with Mahalanobis distance and person-total correlation
+#' 
+#' ## Without plots
+#' detect.result = kneedle_distance(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)),
+#' plot = FALSE) 
+#' 
+#' ## With plots
+#' detect.result = kneedle_distance(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)),
+#' plot = TRUE) 
+#' 
+#' #' # Make classification decisions
+#' 
+#' predicted.result <- detect.result$distance
+#' predicted.label <- predicted.result
+#' predicted.label[predicted.result<detect.result$threshold] = 0
+#' predicted.label[predicted.result>=detect.result$threshold] = 1
+#' 
+#' # Obtain the thresholds with LazR
+#' detect.lazR = kneedle_distance(cnrexample1, feat_funs=c("lazR"),
+#' pointscales=rep(5, times=ncol(cnrexample1)), plot = TRUE) 
+
+kneedle_distance = function(data, pointscales,leave_one_out=c("both","indices","distance","none"),
                             feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
-                            details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange","EM"),
+                            custom_funs=NULL, missingmethod=c("pointscalemidrange","EM"),
                             parallel_type=c("lapply","parallel","furrr","pbapply"), ncores=NULL, seed=NULL,plot=F){
+  parallel_type=match.arg(parallel_type)
+  missingmethod=match.arg(missingmethod)
+  leave_one_out=match.arg(leave_one_out)
+  if (missingmethod == "EM"){stop("EM has not been implemented yet.")}
   # Two functions used to perform the Kneedle algorithm, extracted from https://rdrr.io/github/MollahLab/gen3DNet/src/R/gen3DNet.R
   dist2d <- function(a,b,c) {
     v1 <- b - c
@@ -99,7 +160,7 @@ kneedle_distance = function(data, pointscales,
     return(reduced_obs)
   }
   # compute the indicators for each row
-  permfun = function(i, data, pointscales, feats_combo, missingmethod){
+  CRIsfun = function(i, data, pointscales, feats_combo, missingmethod,leave_one_out){
     # consider only nonmissing for a given row
     idx_nonmiss = which(!is.na(data[i,]))
     if(length(idx_nonmiss)<=1) {
@@ -110,6 +171,7 @@ kneedle_distance = function(data, pointscales,
     obs_likert = unname(data[i,idx_nonmiss])
     # missing data handling
     # fill in missing in anchor set
+    
     if(missingmethod=="pointscalemidrange") {
       imputepsm <- function(x, pointscales) {
         completed = sapply(1:length(pointscales), function(j) {
@@ -118,11 +180,18 @@ kneedle_distance = function(data, pointscales,
         })
         return(completed)
       }
-      
-      ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
+      if (leave_one_out == "both" || leave_one_out == "indices"){
+        ref = as.matrix(data[-i,idx_nonmiss,drop=FALSE])
+      }else{
+        ref = as.matrix(data[,idx_nonmiss,drop=FALSE])
+      }
       ref_completed = imputepsm(ref, pointscales[idx_nonmiss])
     } else {
+      if (leave_one_out == "both" || leave_one_out == "indices"){
       ref_completed = as.matrix(data[-i, , drop=FALSE]) # don't fill in
+      }else{
+        ref_completed = as.matrix(data[, , drop=FALSE]) # don't fill in
+      }
     }
     # feature space
     obs_nri = feats_combo(rbind(obs_likert), ref_completed, missargs=list(missingmethod=missingmethod, idx_nonmiss=idx_nonmiss))
@@ -130,16 +199,20 @@ kneedle_distance = function(data, pointscales,
   }
   
   # compute the distance with leave-one-out for covariance matrix
-  permfun.distance = function(i, obs_nri,feat_idvals){
+  distancefun = function(i, obs_nri,feat_idvals,leave_one_out){
     # feature space
     # the row/column of obs_nri when only one indicators is different from other scenarios, so I use && here ignoring the possibility of one sample dataset. Better solutions need to be used later.
     if (nrow(obs_nri)>1 && ncol(obs_nri)>1){
+      if (leave_one_out == "both" || leave_one_out == "distance"){
       refdist = as.matrix(obs_nri[-i, , drop=FALSE]) 
+      }else{
+        refdist = as.matrix(obs_nri[, , drop=FALSE]) 
+      }
       distance = feat2dist(obs_nri[i,], refdist, feat_idvals=feat_idvals)
     }
     # For single indicators, I do not use the reference and directly use the value of the indicator
     else{
-      distance = obs_nri[,i]
+      distance = obs_nri[,i] 
     }
     # distance
     return(list(distance = distance))
@@ -149,18 +222,19 @@ kneedle_distance = function(data, pointscales,
     if(!is.null(seed)){
       set.seed(seed)
     }
-    permlist = lapply(1:nrow(data), permfun, data=data, pointscales=pointscales, feats_combo=feats_combo, missingmethod=missingmethod)
+    CRIslist = lapply(1:nrow(data), CRIsfun, data=data, pointscales=pointscales, 
+                      leave_one_out=leave_one_out,feats_combo=feats_combo, missingmethod=missingmethod)
   } else if (parallel_type=="parallel") {
     cl = makeCluster(ncores)
     clusterSetRNGStream(cl, seed)
-    permlist = parLapply(cl, as.list(1:nrow(data)), permfun, data=data, pointscales=pointscales,
-                         feats_combo=feats_combo, missingmethod=missingmethod)
+    CRIslist = parLapply(cl, as.list(1:nrow(data)), CRIsfun, data=data, pointscales=pointscales,
+                         feats_combo=feats_combo, leave_one_out=leave_one_out,missingmethod=missingmethod)
     stopCluster(cl)
   } else if (parallel_type=="pbapply") {
     cl = makeCluster(ncores)
     clusterSetRNGStream(cl, seed)
-    permlist =  pblapply(as.list(1:nrow(data)), permfun, cl=cl,  data=data, pointscales=pointscales,
-                         feats_combo=feats_combo, missingmethod=missingmethod)
+    CRIslist =  pblapply(as.list(1:nrow(data)), CRIsfun, cl=cl,  data=data, pointscales=pointscales,
+                         feats_combo=feats_combo, leave_one_out=leave_one_out, missingmethod=missingmethod)
     stopCluster(cl)
   } else if (parallel_type=="furrr"){
     if(supportsMulticore()){
@@ -168,8 +242,8 @@ kneedle_distance = function(data, pointscales,
     } else {
       plan(multisession, workers=ncores)
     }
-    permlist = future_map(1:nrow(data),  permfun, data=data, pointscales=pointscales,
-                          feats_combo=feats_combo, missingmethod=missingmethod,
+    CRIslist = future_map(1:nrow(data),  CRIsfun, data=data, pointscales=pointscales,
+                          feats_combo=feats_combo, leave_one_out=leave_one_out, missingmethod=missingmethod,
                           .options = furrr_options(seed=seed),
                           .progress=TRUE)
     #FIXME check giving me errors unless I do this
@@ -177,23 +251,26 @@ kneedle_distance = function(data, pointscales,
       plan(sequential)
     }
   }	
-  obs_nri =  t(sapply(permlist, "[[", i="obs_nri"))
+  obs_nri =  t(sapply(CRIslist, "[[", i="obs_nri"))
   
   # Compute distance then
   if(parallel_type=="lapply"){
     if(!is.null(seed)){
       set.seed(seed)
     }
-    permlist = lapply(1:nrow(data), permfun.distance, obs_nri=obs_nri,feat_idvals=feat_idvals)
+    distancelist = lapply(1:nrow(data), distancefun, obs_nri=obs_nri,
+                          leave_one_out=leave_one_out,feat_idvals=feat_idvals)
   } else if (parallel_type=="parallel") {
     cl = makeCluster(ncores)
     clusterSetRNGStream(cl, seed)
-    permlist = parLapply(cl, as.list(1:nrow(data)),  permfun.distance, obs_nri=obs_nri,feat_idvals=feat_idvals)
+    distancelist = parLapply(cl, as.list(1:nrow(data)),  distancefun, 
+                             leave_one_out=leave_one_out,obs_nri=obs_nri,feat_idvals=feat_idvals)
     stopCluster(cl)
   } else if (parallel_type=="pbapply") {
     cl = makeCluster(ncores)
     clusterSetRNGStream(cl, seed)
-    permlist =  pblapply(as.list(1:nrow(data)), permfun.distance, cl=cl,  obs_nri=obs_nri,feat_idvals=feat_idvals)
+    distancelist =  pblapply(as.list(1:nrow(data)), distancefun, cl=cl,  
+                             leave_one_out=leave_one_out,obs_nri=obs_nri,feat_idvals=feat_idvals)
     stopCluster(cl)
   } else if (parallel_type=="furrr"){
     if(supportsMulticore()){
@@ -201,7 +278,8 @@ kneedle_distance = function(data, pointscales,
     } else {
       plan(multisession, workers=ncores)
     }
-    permlist = future_map(1:nrow(data),  permfun.distance, obs_nri=obs_nri,feat_idvals=feat_idvals,
+    distancelist = future_map(1:nrow(data),  distancefun, 
+                              leave_one_out=leave_one_out,obs_nri=obs_nri,feat_idvals=feat_idvals,
                           .options = furrr_options(seed=seed),
                           .progress=TRUE)
     #FIXME check giving me errors unless I do this
@@ -209,7 +287,7 @@ kneedle_distance = function(data, pointscales,
       plan(sequential)
     }
   }	
-  distance =  sapply(permlist, "[[", i="distance")
+  distance =  sapply(distancelist, "[[", i="distance")
   
   # Kneedle algorithm
   distance.sort <- sort(distance)
@@ -227,5 +305,5 @@ kneedle_distance = function(data, pointscales,
          labels = paste0("cutoff point = (", round(distance.sort[index], 3)," , ",round(prob.sort[index]/length(distance), 3),")"), 
          pos = 4, col = "red")
   }
-  list(index=index,threshold=distance.sort[index],distance=distance,case.id = which.max(distance))
+  list(threshold=distance.sort[index],distance=distance)
 }

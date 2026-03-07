@@ -7,9 +7,9 @@
 kneedle_distance(
   data,
   pointscales,
+  leave_one_out = c("both", "indices", "distance", "none"),
   feat_funs = c("mahal", "ptcossim"),
   feat_idvals = c(0, +1),
-  details = FALSE,
   custom_funs = NULL,
   missingmethod = c("pointscalemidrange", "EM"),
   parallel_type = c("lapply", "parallel", "furrr", "pbapply"),
@@ -25,19 +25,19 @@ kneedle_distance(
 categories there are for each item. 
 Length must match the number of columns in \code{data}.}
 
+\item{leave_one_out}{Whether to use leave-one-out strategies when computing the outlier
+statistics and the distance of these outlier statistics. Default is "both". See details.}
+
 \item{feat_funs}{vector of nonresponsivity feature function names. Each function must 
 return a numeric vector. Defaults to Mahalanobis distance and person-total
-cosine similarity. See Details.}
+cosine similarity. See \code{"cnrdetect"}.}
 
 \item{feat_idvals}{vector of ideal values, in the same order as \code{feat_funs}.
 Defaults to 0 and +1 as the ideal points for Mahalanobis distance and person-total
 cosine similarity.}
 
-\item{details}{If \code{FALSE} (the default), returns only p-values. If
-\code{TRUE}, returns additional information in a list.}
-
 \item{custom_funs}{(Optional) named list containing name-function pairs for
-user-defined feature functions. See Details.}
+user-defined feature functions. See \code{"cnrdetect"}.}
 
 \item{missingmethod}{Method for handling missing data. See Details. Options are \code{"pointscalemidrange"} or \code{"EM"}.}
 
@@ -52,8 +52,63 @@ speed up computations considerably provided the computer has more than a couple 
 
 \item{plot}{(Optional) Whether to plot empirical CDF and the cutoff point. Defaults to \code{False}.}
 }
+\value{
+Output is a list with the following elements:
+
+\itemize{
+ \item{\code{threshold}: the cutoff value used for making decisions.}
+ \item{\code{distance}: the distance of indices for each individual (when multiple indices are used) 
+ or the values of the index for each individual (when one index is used)}
+}
+}
 \description{
-When using one outlier statistic, the algorithm will output the cutoff value of this
-specific statistic; when using multiple outlier statistics, it will output the cutoff 
-value of the Mahanolabis Distance consisting of all outlier statistics.
+When using one index, the algorithm will output the cutoff value of this
+specific index; when using multiple indices, it will output the cutoff 
+value of the Mahanolabis Distance of all indices.
+}
+\details{
+Performs Kneedle algorithm for setting threshold (cutoff value) for any given outlier
+statistics. 
+
+When only one index is used in \code{feat_funs}, the algorithm will find thresholds for
+the index without reference to the ideal point. The single index should flag respondents with
+higer values, so manual transformation is needed before calling this function. This implementation
+is to keep aligned with the original paper suggesting using Kneedle for setting thresholds in
+detecting pattern respondents (Bieman et al., 2025)
+
+When multiple indices are used in \code{feat_funs}, the algorithm will find thresholds for
+the indices with reference to the ideal points. Same as the main function (\code{cnrdetect}), 
+the distance of all these indices. Some indices (e.g., "mahal" and "ptc") require reference 
+samples for computation, and the distance measure also require computing the covariance matrix of
+indices based on a reference sample. Currently, two possible samples are provided
+for both steps: using the whole sample (i.e., each individual has the same reference sample) 
+or the leave-one-out sample (LOO, i.e., each individual has a different reference sample, which is all 
+other respondents). The choice is controlled by \code{leave_one_out}. "Both" means that LOO is used 
+for both steps; "indices" means that LOO is only used for computing relevant indices;
+"distance" means that LOO is only used for computing distance; "none" means that
+LOO is not used.
+}
+\examples{
+set.seed(4452)
+
+# Obtain the thresholds and distance with Mahalanobis distance and person-total correlation
+
+## Without plots
+detect.result = kneedle_distance(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)),
+plot = FALSE) 
+
+## With plots
+detect.result = kneedle_distance(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)),
+plot = TRUE) 
+
+#' # Make classification decisions
+
+predicted.result <- detect.result$distance
+predicted.label <- predicted.result
+predicted.label[predicted.result<detect.result$threshold] = 0
+predicted.label[predicted.result>=detect.result$threshold] = 1
+
+# Obtain the thresholds with LazR
+detect.lazR = kneedle_distance(cnrexample1, feat_funs=c("lazR"),
+pointscales=rep(5, times=ncol(cnrexample1)), plot = TRUE) 
 }

@@ -4,9 +4,9 @@
 #' some nonresponsive pattern to complete the items.
 #' 
 #' @inheritParams rcnrunif
-#' @param type Pattern type. "updown", "endpoints", "step". See details.
+#' @param type Pattern type. "updown", "endpoints", "step", "straightlining","seesawing","steplining", and "extremeSeesawing". See details.
 #' @param prob Probability that pattern will be broken for any given item.
-#' @param nstep If "step", how many times a response is typically repeated.
+#' @param nstep If "step" or "steplining", how many times a response is typically repeated.
 #' @details
 #' 
 #' The goal of this function is to mimic the case where a participant is
@@ -26,10 +26,34 @@
 #' With "step", responses are similar to "updown" but the same response may be
 #' repeated multiple times. e.g., 111222333.
 #' 
-#' If \code{prob} is non-zero, \code{prob} of the time some other category is
-#' chosen with uniform probability.
+#' With "straightlining", responses are fixed to an identical category across all items.
+#' The fixed category is drawn randomly from all possible responses.
 #' 
-#' Likert-type categories are from 1 (not 0) to K where K is the highest category.
+#' With "seesawing", participants complete items using a pattern close to zig-zag,
+#' but the recurring sequence is randomly selected from adjacent categories. e.g., 
+#' 1, 2, 3, 2, 1, 2, 3, etc.; 4,3,4,3,4,3,4,etc.; 2, 3, 4, 5, 4, 3, 2, etc. 
+#' Two random categories are chosen as starting and ending
+#' points and if the survey switches between subscales with different numbers of
+#' categories per item (as specified by \code{pointscales}), the pattern also
+#' starts over again at new random starting and ending points. Item responses are 
+#' not independent in this case as the response to one item is often 
+#' dependent on the participant's response to a previous item.
+#'  
+#' With "steplining", participants complete items using a straightlining pattern
+#' with moving anchors. i.e., they repeat one response category multiple times and then move to 
+#' the next adjacent category. e.g., 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 1, 1, 1, etc.
+#' Like seesawing, two random categories are chosen as starting and ending
+#' points and if the survey switches between subscales with different numbers of
+#' categories per item (as specified by \code{pointscales}), the pattern also
+#' starts over again at new random starting and ending points. Item responses are 
+#' not independent in this case as the response to one item is often 
+#' dependent on the participant's response to a previous item.
+#' 
+#' 
+#' With "extremeSeesawing", participants complete items using a pattern similar to
+#' seesawing, but the recurring sequence consist of solely two endpoints of the scale.
+#' e.g., 1, 5, 1, 5, 1, 5, etc.; 7, 1, 7, 1, 7, 1, etc. Other generation details are the same
+#' as "seesawing".
 #' 
 #' @return The sample matrix.
 #' 
@@ -92,20 +116,26 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step","straightl
       start = tmp
       inc = 1
       while(T){
-        interval = sample(1:pointscales[1],1)
-        if (start!=interval) break
+        end = sample(1:pointscales[1],1)
+        if (start!=end) break
       }
       for(j in 2:length(pointscales)){
-        if (start < interval){ # from smaller to larger response category
-          if(tmp[j-1] == interval){ # reached ending category
+        if (pointscales[j] != pointscales[j-1]) { # change in pointscales?
+          start = sample(pointscales[j], 1)
+          while(T){
+            end = sample(1:pointscales[j],1)
+            if (start!=end) break
+          }
+        } 
+        if (start < end){ # from smaller to larger response category
+          if(tmp[j-1] == end){ # reached ending category
             inc = -1            
           } else if (tmp[j-1] == start) { # reached starting category
             inc = 1
           } 
           tmp = c(tmp, tmp[j-1]+inc)
-        }
-        else{# from larger to smaller response category
-          if(tmp[j-1] == interval){ # reached ending category
+        } else{# from larger to smaller response category
+          if(tmp[j-1] == end){ # reached ending category
             inc = 1            
           } else if (tmp[j-1] == start) { # reached starting category
             inc = -1
@@ -129,6 +159,9 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step","straightl
         # get random response?
         if(sample(c(TRUE,FALSE), 1, prob = c(prob, 1-prob))){
           tmp = c(tmp, sample(pointscales[j], 1))
+        } else if (pointscales[j] != pointscales[j-1]){
+          fixed.resp <- sample(1:pointscales[j],1)
+          tmp = c(tmp, fixed.resp)
         } else {
           tmp = c(tmp, fixed.resp)
         }
@@ -187,25 +220,25 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step","straightl
       nrep = 1
       nstep = sample(2:nstep,1)
       while(T){
-        interval = sample(1:pointscales[1],1)
-        if (start!=interval) break
+        end = sample(1:pointscales[1],1)
+        if (start!=end) break
       }
       for(j in 2:length(pointscales)){
         if (pointscales[j] != pointscales[j-1]) { # change in pointscales? restart
           tmp = c(tmp, sample(pointscales[j], 1))
           start = tmp[j]
           while(T){
-            interval = sample(1:pointscales[j],1)
-            if (start!=interval) break
+            end = sample(1:pointscales[j],1)
+            if (start!=end) break
           }     
         } 
-        if (start < interval){ #from smaller to larger response category
+        if (start < end){ #from smaller to larger response category
           if(nrep < nstep){
             tmp = c(tmp, tmp[j-1]) # same response as last time
             nrep = nrep + 1
           } else {
-            if(tmp[j-1] == interval){ # reached ending category
-              inc = -(interval-start)
+            if(tmp[j-1] == end){ # reached ending category
+              inc = -(end-start)
               nrep = 1
             } 
             else{
@@ -214,14 +247,13 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step","straightl
             tmp = c(tmp, tmp[j-1]+inc)
             nrep = 1
           }
-        }
-        else{
+        } else{
           if(nrep < nstep){ # from larger to smaller response category
             tmp = c(tmp, tmp[j-1]) # same response as last time
             nrep = nrep + 1
           } else {
-            if(tmp[j-1] == interval){ # reached ending category
-              inc = -(interval-start)
+            if(tmp[j-1] == end){ # reached ending category
+              inc = -(end-start)
               nrep = 1
             } 
             else{
@@ -242,17 +274,27 @@ rcnrpat = function(n, pointscales, type=c("updown","endpoints","step","straightl
     }))
   }  else if (type=="extremeSeesawing"){
     dat = t(sapply(1:n, function(i){
-      tmp = sample(c(1,pointscales[1]),1)
-      start = tmp
-      end = pointscales[1] +1 - start
-      tmp = c(start,end)
+      start = sample(c(1,pointscales[1]),1)
+      if (start == 1){
+        end = pointscales[2]
+      } else {
+        end = 1
+      }
+      tmp <- c(start,end)
       j = 3
       while(j <= length(pointscales)){
+        if (pointscales[j] != pointscales[j-2]) { # change in pointscales?
+          start = sample(c(1,pointscales[j]),1)
+          if (start == 1){
+            end = pointscales[j+1]
+          } else {
+            end = 1
+          }
+        } 
         if (length(tmp) >= length(pointscales)-1){
           tmp = c(tmp, start)
           j = j + 1
-        }
-        else{
+        }else{
           tmp = c(tmp, c(start,end))
           j = j + 2
         }
