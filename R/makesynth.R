@@ -90,7 +90,7 @@ makesynth = function(i, data, pointscales, numperms=200,
     bypointscale = lapply(unique_pointscales, function(k) {
       
       obs_thispointscale = obs[which(pointscales == k)]
-      if(mcorder < 2){stop("mcorder should be an integer, 2 or greater")}
+      #if(mcorder < 2){stop("mcorder should be an integer, 2 or greater")}
       mcorder = floor(mcorder)
       
       ngfit <- ngram(paste0(obs_thispointscale, collapse=""),mcorder,sep="")
