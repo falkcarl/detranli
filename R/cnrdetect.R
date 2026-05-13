@@ -1,23 +1,6 @@
 #' Full content-nonresponsivity detection
 #' 
-#' Compute p-values for each respondent.
-#' If the number of response options is the same for all items, 
-#' the null hypothesis is that the response vector is exchangeable.
-#' If the number of response options is not all the same, 
-#' the null hypothesis is that: 
-#' each subset of items that have the same number of response options is exchangeable; 
-#' and subsets of items having different numbers of response options are independent.
-#' 
-#' Likert-type response data must be 1 to K where K is the highest response category. 
-#' Missing values must be \code{NA}.
-#' 
-#' For the row tested, missing items are excluded from the test.
-#' When no more than one item is nonmissing, p-value defaults to \code{NA}.
-#' For the anchor sample, cells that have not been excluded but are missing are 
-#' imputed with the midrange (e.g. "3" on a scale of 1 to 5).
-#' 
-#' When there are issues computing feature-space covariances, 
-#' p-value defaults to \code{NA}.
+#' @description Compute p-values for each respondent for detecting content-nonresponsivity.
 #' 
 #' @param data Likert-type data (matrix or dataframe).
 #' @param pointscales vector of integers indicating how many Likert-type response 
@@ -47,18 +30,49 @@
 #' sample based on the available probabilities (\code{FALSE}). 
 #' @param parallel_type (Experimental) If desired, the method of parallel processing. Each row's test
 #' can be executed on a separate processing core. Options are \code{"lapply"} (default, no parallelization),
-#' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package). The latter two may
+#' \code{"parallel"} (uses parallel package), \code{"furrr"} (uses furrr package),
+#' \code{"pbapply"} (uses pbapply package, with progress bar). The latter packages may
 #' speed up computations considerably provided the computer has more than a couple processing cores to use.
 #' @param ncores (Experimental/Optional) Number of processing cores to use if doing parallel processing.
 #' @param seed (Optional) A random number seed, if you want the function to set the seed. Defaults to \code{NULL}.
 #' 
 #' @details
-#' Performs the permutation test in Ilagan and Falk (2023) for detecting survey
-#' bots (or random responders). Assuming items are exchangeable for bots (but not
-#' for diligent humans), p-values represent a test of the null hypothesis that
-#' each row is a bot. Synthetic bots are generated for each row by permuting the
-#' responses in that row. The selected nonresponsitivity indices (\code{feat_funs})
-#' for each row and its synthetic bots are computed using leave-one-out calculations
+#' The original design of this function was to performs the permutation test in
+#' Ilagan and Falk (2024) for detecting survey bots (or random responders).
+#' Assuming items are exchangeable for random responses (but not for diligent
+#' humans), p-values represent a test of the null hypothesis that each row is a
+#' random responder.
+#' 
+#' Synthetic responders to generate the null distribution are generated for each
+#' row. In the original \code{synthtype="perm"}, permutations of the row are
+#' used. Use of other synthetic responder generation techniques such as
+#' \code{"markovchain"} and \code{"homarkovchain"} are experimental. Use of
+#' n-grams (\code{"ngram"}) may replace these methods and is under study.
+#' 
+#' Likert-type response data must be 1 to K where K is the highest response category. 
+#' Missing values must be \code{NA}. For experimental methods (e.g., \code{"ngram"}),
+#' responses for all research subjects should be in the same order of appearance
+#' as in the survey.
+#' 
+#' To handle surveys consisting of multiple inventories or inventories with a
+#' different number of categories per item, Ilagan and Falk (2025) used the 
+#' following with the original method to simulate synhetic respondents:
+#' 
+#' If the number of response options is the same for all items, the null
+#' hypothesis is that the response vector is exchangeable. If the number of
+#' response options is not all the same, the null hypothesis is that: each
+#' subset of items that have the same number of response options is exchangeable; 
+#' and subsets of items having different numbers of response options are independent.
+#' 
+#' The logic of considering responses within any given subset of items with the
+#' same response options holds for other synthetic respondent data generation
+#' procedures, but has not yet been tested. In particular, use of n-grams is 
+#' currently under study, but not with surveys of a different number of categories (i.e., response options).
+#' Note also that some indices (e.g., lazR) may be tricky to use even with permutations
+#' if the ideal point varies depending on the number of response options.
+#' 
+#' The selected nonresponsitivity indices (\code{feat_funs})
+#' for each row and its synthetic respondents are computed using leave-one-out calculations
 #' with the remainder of the observed data as a reference sample; the distance of
 #' these indices from their ideal points is computed and collapsed into a
 #' one-dimensional space using a distance measure (itself resembling Mahalanobis
@@ -90,12 +104,31 @@
 #' Not great, but what Dupuis et al (2018) used and found to do well enough in
 #' establishing utility of such indices. \code{"EM"} is experimental and uses
 #' the EM algorithm to obtain a saturated mean and covariance matrix, assuming
-#' multivariate normal data from the reference sample. This option is passed 
-#' down to feature functions, which have been written to implement this option.
-#' Custom defined feature functions will not implement this approach unless told
-#' to do so, though the exact way to do this is not yet documented. See
-#' \code{\link{mahal}} for an example. Either way the test may not work well for
-#' rows with high rates of missing data.
+#' multivariate normal data from the reference sample (Falk et al., 2025). This
+#' option is passed down to feature functions, which have been written to
+#' implement this option. Custom defined feature functions will not implement
+#' this approach unless told to do so, though the exact way to do this is not
+#' yet documented. See \code{\link{mahal}} for an example. Either way the test
+#' may not work well for rows with high rates of missing data.
+#' 
+#' To consider some special cases, when no more than one item is nonmissing,
+#' p-value defaults to \code{NA}. When there are issues computing feature-space
+#' covariances, p-value defaults to \code{NA}.
+#' 
+#' @references
+#' Ilagan, M.J., & Falk, C. F. (2024). Model-agnostic unsupervised detection of
+#' bots in a Likert-type questionnaire. *Behavior Research Methods, 56*, 5068-5085.
+#' \url{https://doi.org/10.3758/s13428-023-02246-7}
+#' 
+#' Ilagan, M. J. & Falk, C. F. (2025). Unsupervised detection of random responding
+#' for Likert-type inventories with varying numbers of response categories. *Proceedings
+#' of the 89th Annual International Meeting of the Psychometric Society.*
+#' \url{https://doi.org/10.64028/fnzx384888}
+#' 
+#' Falk, C. F., Ilagan, M. J., Verdam, M. G. E., & Sawatzky, R. (2025). Bot
+#' detection: Simulations and application in people-centered health measurement
+#' surveys. *Proceedings of the 89th Annual International Meeting of the
+#' Psychometric Society.* \url{https://doi.org/10.64028/idns583103}
 #' 
 #' @return Output depends on the value of \code{details}. If \code{FALSE}, a
 #' vector of p-values. Smaller p-values are less suspicious. If not \code{TRUE},
@@ -118,6 +151,7 @@
 #' @importFrom parallel makeCluster clusterSetRNGStream parLapply stopCluster
 #' @importFrom furrr future_map furrr_options
 #' @importFrom future plan multicore multisession sequential
+#' @importFrom pbapply pblapply
 #' @importFrom parallelly supportsMulticore
 #' @importFrom stats setNames
 #' @export
@@ -130,22 +164,22 @@
 #'   numperms=1000) 
 #' 
 #' # If wishing to do classification with, 95% sensitivity
-#' flags = ifelse(pvals < .05, "human", "bot")
+#' flags = ifelse(pvals < .05, "human", "random")
 #' 
 #' # Obtain more than just p-values
 #' permresults = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
 #'   numperms=1000, details=TRUE)
 #' 
 #' # again, generate flags
-#' flags = ifelse(permresults$pvals < .05, "human", "bot")
+#' flags = ifelse(permresults$pvals < .05, "human", "random")
 #' 
-#' # Take a look at the indices of a probable human versus its synthetic bots
+#' # Take a look at the indices of a probable human versus its synthetic respondents
 #' # Note that the ease of extracting such output is a work in progress.
 #' # Also note that in plots, the ideal point (least suspicious) is (0,+1), which
 #' # is in the direction of the upper-left corner of each plot.
 #' idx = which(flags=="human")[1]
 #' 
-#' # plot its synthetic bots
+#' # plot its synthetic respondents
 #' plot(permresults$synth_nris[[idx]], xlab="MD", ylab="ptcossim",
 #'      xlim=c(4,6.5), ylim=c(.75,.9))
 #' 
@@ -153,20 +187,20 @@
 #' points(x=permresults$obs_nris[idx,1], y=permresults$obs_nris[idx,2], col="blue",
 #'   pch=19)
 #' 
-#' # Now look at a probably bot versus its synthetic bots
-#' idx = which(flags=="bot")
+#' # Now look at a probably random versus its synthetic bots
+#' idx = which(flags=="random")
 #' idx = idx[length(idx)]
 #' 
-#' # plot its synthetic bots
+#' # plot its synthetic responders
 #' plot(permresults$synth_nris[[idx]], xlab="MD", ylab="ptcossim",
 #'      xlim=c(3.5,5.5), ylim=c(.85,.95))
 #' 
-#' # add point for this probable bot:
+#' # add point for this probable random responder:
 #' points(x=permresults$obs_nris[idx,1], y=permresults$obs_nris[idx,2], col="red",
 #'   pch=19)
 #' 
 #' 
-#' # Parallel processing examples
+#' # Parallel processing and other examples
 #' 
 #' # Using parallel package, 2 cores:
 #' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
@@ -175,11 +209,30 @@
 #' # Using furrr package, 2 cores:
 #' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
 #'    numperms=1000, parallel_type="furrr", ncores = 2, seed=1234)
+#'    
+#' # Using  pbapply package, 2 cores:
+#' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)), 
+#'    numperms=1000, parallel_type="pbapply", ncores = 2, seed=1234)    
+#'    
+#' # Other examples meant for detecting patterned responses
+#' 
+#' # permutations with MD, PTC, and LazR
+#' # Note: ideal value for LazR may be something like 1/k where k is number
+#' # of categories per item...
+#' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)),
+#'    feat_funs = c("mahal","ptcor","lazR"),
+#'    feat_idvals = c(0, 1, .2))
+#' 
+#' # 4-gram with default MD and PTC
+#' pvals = cnrdetect(cnrexample1, pointscales=rep(5, times=ncol(cnrexample1)),
+#'    synthtype="ngram", mcorder = 4)
+#'    
+#'    
 cnrdetect = function(data, pointscales, numperms=1e3,
 feat_funs=c("mahal", "ptcossim"), feat_idvals=c(0, +1),
 details=FALSE, custom_funs=NULL, missingmethod=c("pointscalemidrange","EM"),
-synthtype=c("perm","markovchain","homarkovchain"), mcorder=2, highestprob=FALSE,
-parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
+synthtype=c("perm","markovchain","homarkovchain","ngram"), mcorder=2, highestprob=FALSE,
+parallel_type=c("lapply","parallel","furrr","pbapply"), ncores=NULL, seed=NULL) {
   
 	# check input
 	stopifnot(ncol(data)==length(pointscales))
@@ -260,6 +313,12 @@ parallel_type=c("lapply","parallel","furrr"), ncores=NULL, seed=NULL) {
 	  clusterSetRNGStream(cl, seed)
 	  permlist = parLapply(cl, as.list(1:nrow(data)), permfun, data=data, pointscales=pointscales,
 	                 numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
+	  stopCluster(cl)
+	} else if (parallel_type=="pbapply") {
+	  cl = makeCluster(ncores)
+	  clusterSetRNGStream(cl, seed)
+	  permlist = pblapply(as.list(1:nrow(data)), permfun, cl=cl,  data=data, pointscales=pointscales,
+	                      numperms=numperms, feats_combo=feats_combo, missingmethod=missingmethod)
 	  stopCluster(cl)
 	} else if (parallel_type=="furrr"){
 	  if(supportsMulticore()){

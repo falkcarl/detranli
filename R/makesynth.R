@@ -1,7 +1,7 @@
 #' Make synthetic data
 #' 
 #' Generate synthetic data for the i-th null hypothesis: that the i-th response vector 
-#' is exchangeable.
+#' is exchangeable or follows a sequential process.
 #' 
 #' This function accommodates multiple point-scales. 
 #' Items are grouped by point-scale, and responses are permuted only within each group.
@@ -21,6 +21,14 @@
 #' @param highestprob When \code{"homarkovchain"} is chosen, whether to simulate
 #' using the next category that has the highest probability (\code{TRUE}) or
 #' sample based on the available probabilities (\code{FALSE}).
+#' 
+#' @details
+#' The original \code{"perm"} method uses permutations is based on Ilagan & Falk
+#' (2024). Additional \code{"markovchain"} and \code{"homarkovchain"} were
+#' added as experimental options. The latest, \code{"ngram"}, however, may
+#' subsume some of the other Markov Chain options. Thus, \code{"markovchain"}
+#' and \code{"homarkovchain"} may be removed in later versions.
+#'  
 #' 
 #' @return The empirical null distribution, a matrix where the first row is the observed response vector.
 #' 
@@ -90,7 +98,7 @@ makesynth = function(i, data, pointscales, numperms=200,
     bypointscale = lapply(unique_pointscales, function(k) {
       
       obs_thispointscale = obs[which(pointscales == k)]
-      if(mcorder < 2){stop("mcorder should be an integer, 2 or greater")}
+      if(mcorder < 1){stop("mcorder should be an integer, 1 or greater")}
       mcorder = floor(mcorder)
       
       ngfit <- ngram(paste0(obs_thispointscale, collapse=""),mcorder,sep="")
